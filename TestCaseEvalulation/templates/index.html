@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CEV Rules — Test Automation Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-base:#07090f;--bg-surface:#0c1120;--bg-card:#111827;--bg-card2:#141e30;
+  --bg-input:#0a0e1a;--bg-hover:#182236;
+  --border:#1a2540;--border2:#243350;--border-focus:#3b82f6;
+  --blue:#3b82f6;--blue-d:#1d4ed8;--blue-glow:rgba(59,130,246,.18);--blue-pale:rgba(59,130,246,.09);
+  --cyan:#06b6d4;--cyan-d:#0891b2;
+  --green:#10b981;--green-d:#059669;--green-pale:rgba(16,185,129,.1);
+  --red:#ef4444;--red-d:#dc2626;--red-pale:rgba(239,68,68,.1);
+  --amber:#f59e0b;--amber-d:#d97706;--amber-pale:rgba(245,158,11,.1);
+  --violet:#8b5cf6;
+  --tx:#dde4ee;--tx-soft:#8896a8;--tx-muted:#3d4f68;--tx-bright:#f0f4ff;
+  --r:10px;--rlg:14px;--tr:140ms cubic-bezier(.4,0,.2,1);
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);color:var(--tx);min-height:100vh;line-height:1.6}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#1a2540;border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:#243350}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+
+/* ── Topbar ── */
+.topbar{
+  background:linear-gradient(90deg,#04060e 0%,#091228 100%);
+  border-bottom:1px solid var(--border);padding:0 26px;height:58px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 0%,var(--blue) 30%,var(--cyan) 70%,transparent 100%);opacity:.4}
+.brand{display:flex;align-items:center;gap:11px}
+.brand-icon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:16px;
+  background:linear-gradient(135deg,var(--blue-d),var(--cyan-d));box-shadow:0 0 14px rgba(59,130,246,.4)}
+.brand-name{font-size:.95rem;font-weight:700;color:var(--tx-bright);letter-spacing:-.3px}
+.brand-sub{font-size:.64rem;color:var(--tx-muted);margin-top:1px;letter-spacing:.3px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.api-pill{display:flex;align-items:center;gap:6px;padding:4px 12px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:20px;font-size:.7rem;color:var(--tx-soft)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot.off{background:var(--red);box-shadow:0 0 6px var(--red)}
+
+/* ── Body grid ── */
+.body{display:grid;grid-template-columns:244px 1fr;height:calc(100vh - 58px);overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--bg-surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;padding:16px 0}
+.sb-section{padding:0 12px 4px;margin-bottom:2px}
+.sb-label{font-size:.6rem;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--tx-muted);padding:0 6px;margin-bottom:7px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r);
+  cursor:pointer;font-size:.8rem;font-weight:500;color:var(--tx-soft);
+  transition:var(--tr);user-select:none;margin-bottom:2px}
+.nav-item:hover{background:var(--bg-hover);color:var(--tx)}
+.nav-item.active{background:var(--blue-pale);color:var(--blue);font-weight:600;border:1px solid rgba(59,130,246,.2)}
+.nav-icon{font-size:14px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--green);color:#000;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:10px}
+.sb-div{border:none;border-top:1px solid var(--border);margin:9px 12px}
+.status-panel{margin:0 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px}
+.status-row{display:flex;align-items:center;justify-content:space-between;font-size:.72rem;padding:3px 0}
+.status-row .lbl{color:var(--tx-muted)}
+.sv{font-weight:600;color:var(--tx-soft);font-size:.72rem}
+.sv.ok{color:var(--green)}.sv.warn{color:var(--amber)}.sv.err{color:var(--red)}
+
+/* ── Content ── */
+.content{overflow-y:auto;padding:22px 26px;display:flex;flex-direction:column;gap:18px;background:var(--bg-base)}
+
+/* ── Tab panels ── */
+.tab-panel{display:none;flex-direction:column;gap:18px;animation:fadeUp .2s ease}
+.tab-panel.active{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Cards ── */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rlg);padding:20px;box-shadow:0 2px 14px rgba(0,0,0,.35)}
+.card-glow{box-shadow:0 0 0 1px var(--border),0 0 30px rgba(59,130,246,.05)}
+.card-title{font-size:.82rem;font-weight:700;color:var(--tx-bright);display:flex;align-items:center;gap:8px;
+  margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--border)}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue-d),var(--cyan-d));color:#fff;font-size:.66rem;font-weight:800;flex-shrink:0;
+  box-shadow:0 0 10px rgba(59,130,246,.45)}
+
+/* ── Forms ── */
+label{font-size:.73rem;font-weight:600;color:var(--tx-soft);display:block;margin-bottom:5px;letter-spacing:.15px}
+textarea,input[type=text],input[type=number],input[type=date],select{
+  width:100%;padding:8px 11px;background:var(--bg-input);border:1.5px solid var(--border);
+  border-radius:var(--r);font-family:inherit;font-size:.8rem;color:var(--tx);
+  transition:border-color var(--tr),box-shadow var(--tr);outline:none;resize:vertical}
+textarea{font-family:'JetBrains Mono',monospace;font-size:.74rem;line-height:1.75;color:#b0c0d6}
+input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,select:focus,textarea:focus{
+  border-color:var(--border-focus);box-shadow:0 0 0 3px var(--blue-glow);background:#080d18}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--blue);cursor:pointer}
+
+/* Upload zone */
+.upload-zone{
+  border:1.5px dashed var(--border2);border-radius:var(--r);padding:9px 13px;
+  display:flex;align-items:center;gap:9px;background:var(--bg-input);
+  cursor:pointer;transition:var(--tr);color:var(--tx-soft);font-size:.76rem}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-pale);color:var(--blue)}
+.upload-zone input[type=file]{display:none}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 15px;border-radius:var(--r);
+  font-family:inherit;font-size:.8rem;font-weight:600;cursor:pointer;border:none;
+  transition:var(--tr);white-space:nowrap;letter-spacing:.1px}
+.btn:disabled{opacity:.32;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--blue-d),var(--blue));color:#fff;box-shadow:0 2px 12px rgba(59,130,246,.25)}
+.btn-primary:hover:not(:disabled){box-shadow:0 4px 20px rgba(59,130,246,.5);transform:translateY(-1px)}
+.btn-success{background:linear-gradient(135deg,var(--green-d),var(--green));color:#000;box-shadow:0 2px 12px rgba(16,185,129,.2)}
+.btn-success:hover:not(:disabled){box-shadow:0 4px 20px rgba(16,185,129,.45);transform:translateY(-1px)}
+.btn-outline{background:transparent;color:var(--tx-soft);border:1.5px solid var(--border2)}
+.btn-outline:hover:not(:disabled){border-color:var(--blue);color:var(--blue);background:var(--blue-pale)}
+.btn-ghost{background:transparent;color:var(--tx-soft);border:none;padding:5px 9px}
+.btn-ghost:hover:not(:disabled){color:var(--tx);background:var(--bg-hover)}
+.btn-lg{padding:10px 24px;font-size:.88rem}
+.btn-full{width:100%;justify-content:center}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── Alerts ── */
+.alert{padding:10px 13px;border-radius:var(--r);font-size:.78rem;display:flex;align-items:flex-start;gap:8px}
+.alert-info{background:rgba(59,130,246,.09);border:1px solid rgba(59,130,246,.22);color:#93c5fd}
+.alert-success{background:var(--green-pale);border:1px solid rgba(16,185,129,.28);color:#6ee7b7}
+.alert-warn{background:var(--amber-pale);border:1px solid rgba(245,158,11,.28);color:#fcd34d}
+.alert-error{background:var(--red-pale);border:1px solid rgba(239,68,68,.28);color:#fca5a5}
+.alert-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+
+/* ── Metrics ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.metric-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rlg);
+  padding:15px 17px;position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--blue)}
+.metric-card.pass::before{background:linear-gradient(90deg,var(--green-d),var(--green))}
+.metric-card.fail::before{background:linear-gradient(90deg,var(--red-d),var(--red))}
+.metric-card.invalid::before{background:linear-gradient(90deg,var(--amber-d),var(--amber))}
+.metric-card.rate::before{background:linear-gradient(90deg,var(--cyan-d),var(--cyan))}
+.metric-label{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--tx-muted);margin-bottom:7px}
+.metric-value{font-size:1.9rem;font-weight:800;color:var(--tx-bright);line-height:1}
+.metric-card.pass .metric-value{color:var(--green)}.metric-card.fail .metric-value{color:var(--red)}
+.metric-card.invalid .metric-value{color:var(--amber)}.metric-card.rate .metric-value{color:var(--cyan)}
+.metric-sub{font-size:.68rem;color:var(--tx-muted);margin-top:4px}
+
+/* ── Log box ── */
+.log-box{background:#030508;border:1px solid var(--border);border-radius:var(--r);
+  padding:13px 15px;font-family:'JetBrains Mono',monospace;font-size:.72rem;
+  line-height:1.9;min-height:136px;max-height:210px;overflow-y:auto;color:var(--tx-muted)}
+.log-line{display:block}.log-line .ts{color:#1e2d4a}
+.log-line.active{color:#60a5fa}.log-line.done{color:var(--green)}.log-line.err{color:var(--red)}
+
+/* ── Progress bar ── */
+.progress-wrap{background:#0a0e1a;border-radius:10px;height:4px;overflow:hidden;margin:9px 0}
+.progress-bar{height:100%;width:0%;border-radius:10px;transition:width .5s ease;
+  background:linear-gradient(90deg,var(--blue-d),var(--cyan));box-shadow:0 0 8px rgba(59,130,246,.5)}
+
+/* ── Table ── */
+.table-wrap{overflow:auto;border-radius:var(--r);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.76rem}
+thead tr{background:#06090f;position:sticky;top:0;z-index:5}
+thead th{padding:9px 12px;font-weight:700;font-size:.63rem;text-transform:uppercase;
+  letter-spacing:.8px;text-align:left;white-space:nowrap;color:var(--tx-muted);border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid rgba(26,37,64,.5);transition:background var(--tr)}
+tbody tr:hover{background:var(--bg-hover)}
+tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
+.empty-state{text-align:center;padding:40px 20px;color:var(--tx-muted)}
+.empty-state .icon{font-size:2.2rem;margin-bottom:9px;display:block;opacity:.4}
+
+/* ── Chips ── */
+.chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:.66rem;font-weight:700;letter-spacing:.2px}
+.chip-pass{background:rgba(16,185,129,.13);color:#6ee7b7;border:1px solid rgba(16,185,129,.22)}
+.chip-fail{background:rgba(239,68,68,.13);color:#fca5a5;border:1px solid rgba(239,68,68,.22)}
+.chip-invalid{background:rgba(245,158,11,.13);color:#fcd34d;border:1px solid rgba(245,158,11,.22)}
+.chip-positive{background:rgba(59,130,246,.11);color:#93c5fd;border:1px solid rgba(59,130,246,.18)}
+.chip-negative{background:rgba(139,92,246,.11);color:#c4b5fd;border:1px solid rgba(139,92,246,.18)}
+.chip-edge{background:rgba(6,182,212,.11);color:#67e8f9;border:1px solid rgba(6,182,212,.18)}
+.chip-invdata{background:rgba(245,158,11,.11);color:#fcd34d;border:1px solid rgba(245,158,11,.18)}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-chip{padding:3px 11px;border-radius:20px;font-size:.7rem;font-weight:600;
+  cursor:pointer;border:1.5px solid var(--border);transition:var(--tr);user-select:none;color:var(--tx-muted);background:var(--bg-card)}
+.filter-chip:hover{border-color:var(--border2);color:var(--tx-soft)}
+.filter-chip.active.all{border-color:var(--border2);color:var(--tx-soft);background:var(--bg-hover)}
+.filter-chip.active.pass{border-color:var(--green);color:var(--green);background:var(--green-pale)}
+.filter-chip.active.fail{border-color:var(--red);color:var(--red);background:var(--red-pale)}
+.filter-chip.active.invalid{border-color:var(--amber);color:var(--amber);background:var(--amber-pale)}
+
+/* ── Grids ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── Drawer ── */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(3px)}
+.drawer-overlay.open{opacity:1;pointer-events:all}
+.drawer{position:fixed;right:0;top:0;bottom:0;width:660px;max-width:95vw;background:var(--bg-surface);
+  border-left:1px solid var(--border);box-shadow:var(--shadow-lg,-20px 0 60px rgba(0,0,0,.6));z-index:201;
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+  justify-content:space-between;background:var(--bg-card)}
+.drawer-header h3{font-size:.88rem;font-weight:700;color:var(--tx-bright)}
+.drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
+.drawer-close{background:var(--bg-hover);border:1px solid var(--border);color:var(--tx-soft);
+  cursor:pointer;padding:4px 9px;border-radius:6px;font-size:.88rem}
+.drawer-close:hover{color:var(--tx);border-color:var(--border2)}
+
+/* ── JSON block ── */
+.json-block{background:#030508;border:1px solid var(--border);border-radius:var(--r);
+  padding:11px 13px;font-family:'JetBrains Mono',monospace;font-size:.7rem;
+  line-height:1.75;color:#7dd3fc;overflow:auto;max-height:260px;white-space:pre}
+
+/* ── Charts ── */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rlg);padding:16px}
+.chart-title{font-size:.68rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:13px}
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:7px}
+.bar-label{font-size:.68rem;color:var(--tx-muted);width:140px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;background:#0a0e1a;border-radius:3px;height:15px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.bar-fill.pass{background:linear-gradient(90deg,#059669,#10b981)}
+.bar-fill.fail{background:linear-gradient(90deg,#dc2626,#ef4444)}
+.bar-fill.total{background:linear-gradient(90deg,#1d4ed8,#3b82f6)}
+.bar-count{font-size:.66rem;font-weight:700;color:var(--tx-muted);width:22px;text-align:right;flex-shrink:0}
+
+/* ── Agent cards ── */
+.agent-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+.agent-card{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--rlg);padding:13px 15px;position:relative;overflow:hidden}
+.agent-card::after{content:attr(data-num);position:absolute;right:11px;bottom:7px;font-size:2.8rem;font-weight:800;color:rgba(59,130,246,.05);line-height:1;pointer-events:none}
+.agent-name{font-size:.8rem;font-weight:700;color:var(--tx-bright);margin-bottom:2px}
+.agent-role{font-size:.68rem;color:var(--cyan);font-weight:600;margin-bottom:5px}
+.agent-desc{font-size:.72rem;color:var(--tx-muted);line-height:1.5}
+.agent-badge{display:inline-block;padding:2px 7px;background:rgba(59,130,246,.1);color:var(--blue);
+  border:1px solid rgba(59,130,246,.18);border-radius:5px;font-size:.62rem;font-weight:700;margin-top:6px}
+
+/* ── Search hit ── */
+.search-hit{background:#030508;border:1px solid var(--border);border-radius:var(--r);
+  padding:9px 12px;margin-bottom:7px;font-family:'JetBrains Mono',monospace;
+  font-size:.7rem;color:var(--tx-soft);white-space:pre-wrap;line-height:1.6}
+.search-hit-label{font-size:.62rem;font-weight:700;color:var(--blue);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+
+/* ── Misc ── */
+.divider{border:none;border-top:1px solid var(--border);margin:4px 0}
+.txt-muted{color:var(--tx-muted);font-size:.72rem}
+.mt-3{margin-top:11px}.mt-4{margin-top:15px}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.pill{display:inline-block;padding:2px 7px;border-radius:12px;font-size:.66rem;font-weight:600}
+.pill-blue{background:rgba(59,130,246,.1);color:#93c5fd}
+.pill-green{background:var(--green-pale);color:var(--green)}
+.pill-amber{background:var(--amber-pale);color:var(--amber)}
+
+@media(max-width:900px){
+  .body{grid-template-columns:1fr}.sidebar{display:none}
+  .metrics-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col,.three-col,.chart-row,.agent-cards{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ TOPBAR ══ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">🧪</div>
+    <div>
+      <div class="brand-name">CEV Rules — Test Automation Portal</div>
+      <div class="brand-sub">CrewAI · FAISS · OpenAI · FastAPI</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="api-pill"><div class="dot" id="apiDot"></div><span id="apiLabel">Loading…</span></div>
+    <div class="api-pill"><span style="color:var(--cyan)">⚡</span><span id="modelLabel" style="color:var(--tx-soft)">Model</span></div>
+  </div>
+</header>
+
+<div class="body">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <div class="sb-section">
+    <div class="sb-label">Navigation</div>
+    <div class="nav-item active" data-tab="setup" onclick="switchTab('setup',this)"><span class="nav-icon">📥</span>Setup &amp; Configure</div>
+    <div class="nav-item" data-tab="pipeline" onclick="switchTab('pipeline',this)"><span class="nav-icon">🚀</span>Run Pipeline</div>
+    <div class="nav-item" data-tab="results" onclick="switchTab('results',this)">
+      <span class="nav-icon">📊</span>Results &amp; Report
+      <span class="nav-badge" id="resultBadge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" data-tab="manual" onclick="switchTab('manual',this)"><span class="nav-icon">🔍</span>Manual Tester</div>
+  </div>
+  <hr class="sb-div"/>
+  <div class="sb-section">
+    <div class="sb-label">Session Status</div>
+    <div class="status-panel">
+      <div class="status-row"><span class="lbl">Session</span><span class="sv" id="sideSessionId">—</span></div>
+      <div class="status-row"><span class="lbl">Rules DB</span><span class="sv" id="sideRulesStatus">Not indexed</span></div>
+      <div class="status-row"><span class="lbl">Pipeline</span><span class="sv" id="sidePipelineStatus">Idle</span></div>
+      <div class="status-row"><span class="lbl">Test Cases</span><span class="sv" id="sideTestCount">—</span></div>
+    </div>
+  </div>
+  <hr class="sb-div"/>
+  <div class="sb-section">
+    <div class="sb-label">Quick Actions</div>
+    <button class="btn btn-outline btn-full" onclick="newSession()">🔄 New Session</button>
+  </div>
+</nav>
+
+<!-- ══ CONTENT ══ -->
+<main class="content">
+
+  <!-- ════ SETUP ════ -->
+  <div class="tab-panel active" id="tab-setup">
+
+    <div class="alert alert-info">
+      <span class="alert-icon">ℹ️</span>
+      <div><b>Getting Started:</b> Upload or paste your rules document, index it into FAISS, fill in the sample JSON, then run the pipeline. API key and model are read from <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px">.env</code> automatically.</div>
+    </div>
+
+    <div class="two-col">
+
+      <!-- Rules card -->
+      <div class="card card-glow">
+        <div class="card-title"><span class="step-num">1</span>Rules Document → FAISS Vector DB</div>
+
+        <label>Upload a .txt or .md rules file</label>
+        <label class="upload-zone" id="uploadZone">
+          <span style="font-size:16px">📂</span>
+          <span id="uploadLabel">Click to upload, or drag &amp; drop a .txt / .md file</span>
+          <input type="file" id="rulesFileInput" accept=".txt,.md" onchange="handleRulesUpload(event)"/>
+        </label>
+
+        <div style="margin-top:11px">
+          <label>Business Rules <span class="txt-muted">— type, paste, or upload above</span></label>
+          <textarea id="rulesText" rows="12" placeholder="Paste your priority-ordered rules here…"></textarea>
+        </div>
+
+        <div style="margin-top:11px;display:flex;gap:7px">
+          <button class="btn btn-primary" style="flex:1" onclick="indexRules()">🗄️ Index Rules into FAISS</button>
+          <button class="btn btn-ghost" onclick="clearRules()" title="Clear text">✕ Clear</button>
+        </div>
+        <div id="indexAlert" style="margin-top:9px"></div>
+        <div class="txt-muted mt-3" id="chunkInfo"></div>
+
+        <hr class="divider" style="margin:14px 0"/>
+
+        <div style="font-size:.76rem;font-weight:700;color:var(--tx-soft);margin-bottom:9px;display:flex;align-items:center;gap:6px">
+          <span style="color:var(--cyan)">🔍</span>Test Vector Search
+        </div>
+        <div style="display:flex;gap:7px">
+          <input type="text" id="searchQuery" placeholder="e.g. SNAP exemption criteria" style="flex:1"/>
+          <button class="btn btn-outline" onclick="searchRules()">Search</button>
+        </div>
+        <div id="searchResults" style="margin-top:11px"></div>
+      </div>
+
+      <!-- JSON cards -->
+      <div style="display:flex;flex-direction:column;gap:15px">
+        <div class="card">
+          <div class="card-title"><span class="step-num">2</span>Sample Request JSON</div>
+          <textarea id="sampleRequest" rows="11" placeholder='{"id":"test-001","tanf":false,...}'></textarea>
+          <div id="reqJsonAlert" style="margin-top:6px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="step-num">3</span>Sample Response JSON</div>
+          <textarea id="sampleResponse" rows="7" placeholder='{"status":"SUCCESS","exemptionStatus":"Exempt",...}'></textarea>
+          <div id="respJsonAlert" style="margin-top:6px"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════ PIPELINE ════ -->
+  <div class="tab-panel" id="tab-pipeline">
+    <div class="two-col">
+      <div style="display:flex;flex-direction:column;gap:15px">
+        <div class="card card-glow">
+          <div class="card-title">🚀 Run Test Pipeline</div>
+          <div class="alert alert-info" style="margin-bottom:13px">
+            <span class="alert-icon">⚙️</span>
+            <div>API key and model load from <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px">.env</code> — no manual entry needed.</div>
+          </div>
+          <div id="pipelinePrecheck"></div>
+          <button class="btn btn-success btn-full btn-lg" id="runBtn" onclick="runPipeline()" disabled>▶ Run Full Test Pipeline</button>
+          <div class="progress-wrap mt-3"><div class="progress-bar" id="progressBar"></div></div>
+          <div class="txt-muted" style="text-align:right;margin-top:2px" id="progressPct">0%</div>
+          <div class="log-box mt-3" id="logBox"><span style="color:var(--tx-muted);font-family:'JetBrains Mono',monospace">Pipeline output will appear here…</span></div>
+          <div id="pipelineStatus" style="margin-top:9px"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title">🤖 Pipeline Agents</div>
+          <div class="agent-cards">
+            <div class="agent-card" data-num="1">
+              <div class="agent-name">Test Case Generator</div><div class="agent-role">Senior QA Engineer</div>
+              <div class="agent-desc">Reads rules from FAISS and generates positive, negative, edge case, and invalid data test cases for every rule.</div>
+              <span class="agent-badge">FAISS Search Tool</span>
+            </div>
+            <div class="agent-card" data-num="2">
+              <div class="agent-name">Request Builder</div><div class="agent-role">API Specialist</div>
+              <div class="agent-desc">Constructs exact JSON payloads for each scenario, including boundary values and intentionally invalid data.</div>
+              <span class="agent-badge">Schema Aware</span>
+            </div>
+            <div class="agent-card" data-num="3">
+              <div class="agent-name">API Executor</div><div class="agent-role">Test Runner</div>
+              <div class="agent-desc">Executes every request against the mock rule-based API and collects real responses for each test scenario.</div>
+              <span class="agent-badge">Mock API Tool</span>
+            </div>
+            <div class="agent-card" data-num="4">
+              <div class="agent-name">Test Verifier</div><div class="agent-role">QA Analyst</div>
+              <div class="agent-desc">Compares actual API responses against expected outcomes and marks each test PASS, FAIL, or INVALID.</div>
+              <span class="agent-badge">Rules Search Tool</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ RESULTS ════ -->
+  <div class="tab-panel" id="tab-results">
+    <div id="noResults" class="empty-state">
+      <span class="icon">📊</span>
+      <div style="font-size:.92rem;font-weight:600;color:var(--tx-soft)">No results yet</div>
+      <div style="margin-top:4px;font-size:.78rem">Run the test pipeline to generate results</div>
+      <button class="btn btn-primary" style="margin-top:13px" onclick="switchTab('pipeline',document.querySelector('[data-tab=pipeline]'))">Go to Pipeline →</button>
+    </div>
+    <div id="resultsContent" style="display:none;flex-direction:column;gap:18px">
+      <div class="metrics-grid" id="metricsGrid"></div>
+      <div class="chart-row" id="chartsRow"></div>
+      <div class="card" style="padding:14px 18px">
+        <div class="flex-between">
+          <div>
+            <div style="font-weight:700;color:var(--tx-bright);font-size:.82rem;margin-bottom:2px">📥 Download Reports</div>
+            <div class="txt-muted">Excel: 3 sheets — Test Results · Summary Dashboard · Request/Response Details</div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-success" onclick="downloadExcel()">⬇ Excel (.xlsx)</button>
+            <button class="btn btn-outline" onclick="downloadJSON()">⬇ JSON</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px">
+        <div class="flex-between" style="margin-bottom:11px">
+          <div class="card-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none">Test Case Results</div>
+          <div class="filter-bar">
+            <input type="text" id="searchFilter" placeholder="Search…" oninput="applyFilters()" style="max-width:180px"/>
+            <span class="filter-chip all active" data-filter="ALL" onclick="toggleFilter(this)">All</span>
+            <span class="filter-chip pass" data-filter="PASS" onclick="toggleFilter(this)">✅ Pass</span>
+            <span class="filter-chip fail" data-filter="FAIL" onclick="toggleFilter(this)">❌ Fail</span>
+            <span class="filter-chip invalid" data-filter="INVALID" onclick="toggleFilter(this)">⚠️ Invalid</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Test Case Name</th><th>Rule</th><th>Type</th><th>Expected</th><th>Actual</th><th>Status</th><th></th></tr></thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+        <div class="txt-muted mt-3" id="tableCaption"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ MANUAL TESTER ════ -->
+  <div class="tab-panel" id="tab-manual">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">🔧 Build &amp; Execute Request</div>
+        <div class="three-col" style="gap:9px;margin-bottom:11px">
+          <div><label>ID</label><input type="text" id="m_id" value="manual-test-001"/></div>
+          <div><label>Age</label><input type="number" id="m_age" value="30" min="0" max="120"/></div>
+          <div><label>ME Code</label><input type="text" id="m_meCode" placeholder="optional"/></div>
+        </div>
+        <div class="three-col" style="gap:9px;margin-bottom:11px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_tanf" style="width:auto;flex-shrink:0"/><span>TANF Flag</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_snap" checked style="width:auto;flex-shrink:0"/><span>SNAP Flag</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_formerInmate" style="width:auto;flex-shrink:0"/><span>Former Inmate</span>
+          </label>
+        </div>
+        <div class="three-col" style="gap:9px;margin-bottom:11px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_childCaretaker" style="width:auto;flex-shrink:0"/><span>Child Caretaker &lt;13</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_disabledCaretaker" style="width:auto;flex-shrink:0"/><span>Disabled Caretaker</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 10px;background:var(--bg-input);border-radius:var(--r);border:1px solid var(--border)">
+            <input type="checkbox" id="m_incarceration" style="width:auto;flex-shrink:0"/><span>Incarcerated</span>
+          </label>
+        </div>
+        <div class="two-col" style="gap:9px;margin-bottom:13px">
+          <div><label>Release Date</label><input type="date" id="m_releaseDate"/></div>
+          <div><label>Determination Date</label><input type="date" id="m_detDate" value="2026-03-23"/></div>
+        </div>
+        <hr class="divider" style="margin:11px 0"/>
+        <label>Request Preview</label>
+        <div class="json-block" id="reqPreview" style="max-height:140px;font-size:.68rem"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:11px" onclick="manualExecute()">▶ Execute Request</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <div class="card-title">📡 Response</div>
+          <div id="manualResponse">
+            <div class="empty-state" style="padding:26px">
+              <span class="icon" style="font-size:1.8rem;opacity:.3">📡</span>
+              <div style="font-size:.78rem">Execute a request to see the response</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:11px;padding-bottom:9px;font-size:.78rem">📋 Rule Priority Reference</div>
+          <div id="ruleRef"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+</div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="detailDrawer">
+  <div class="drawer-header">
+    <h3 id="drawerTitle">Test Case Detail</h3>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<script>
+let SESSION_ID=null,allResults=[],activeFilters=new Set(['ALL']),sseSource=null;
+
+const DEFAULTS={
+rules:`Below rules are listed in priority wise. Exemption will be happened based on the priority.
+1. TANF
+if TANF_Flag==TRUE -> Exempt (Reason: TANF Work Requirements Compliance)
+Else -> Not Exempt (Continue to next rule)
+
+2. SNAP
+If SNAP_FLAG==TRUE -> Exempt (Reason: SNAP Household)
+Else -> Not Exempt (Continue to next rule)
+
+3. Under 19 Individual
+If age<19: return Exempt (Reason: Under 19)
+else: return Not Exempt (Continue to next rule)
+
+4. Exemption: Former Inmate within 3-Month lookback (Grace Period)
+A former inmate is Exempt if their release date is within 3 months prior to the determination date.
+If FormerInmateFlag=True and releaseDate between AsOfDate - 3 months and AsOfDate then Exempt (Reason: Former Inmate - 3-month grace)
+else Not Exempt (Continue to next rule)
+
+5. Exemption: Child Caregiver
+If CaretakerOfChildUnder13_Flag==True -> Exempt (Reason: Child Caregiver)
+Else Not Exempt (Continue to next rule)
+
+6. Exemption: Disabled Individual Caregiver
+If CaretakerOfDisabledIndividualFlag==True -> Exempt (Reason: Disabled Individual Caregiver)
+Else Not Exempt`,
+request:`{
+  "id": "test-snap-001",
+  "tanf": false,
+  "age": 30,
+  "meCode": null,
+  "exemptionStatus": null,
+  "snap": true,
+  "caretakerOfChildUnder13": false,
+  "incarcerationStatus": false,
+  "formerInmate": false,
+  "releaseDate": null,
+  "determinationDate": null,
+  "caretakerOfDisabledIndividualFlag": false
+}`,
+response:`{
+  "timestamp": "2026-03-23T12:45:48.807",
+  "status": "SUCCESS",
+  "exemptionStatus": "Exempt",
+  "exemptionReason": "SNAP Household",
+  "ruleFired": "Auto-Exemption: SNAP Household"
+}`};
+
+const RULES_REF=[
+  {num:1,name:"TANF",cond:"tanf = true",color:"#3b82f6"},
+  {num:2,name:"SNAP",cond:"snap = true",color:"#06b6d4"},
+  {num:3,name:"Under 19",cond:"age < 19",color:"#8b5cf6"},
+  {num:4,name:"Former Inmate",cond:"formerInmate + release ≤ 90 days",color:"#10b981"},
+  {num:5,name:"Child Caretaker",cond:"caretakerOfChildUnder13 = true",color:"#f59e0b"},
+  {num:6,name:"Disabled Caretaker",cond:"caretakerOfDisabledIndividualFlag = true",color:"#ef4444"},
+];
+
+async function init(){
+  document.getElementById('rulesText').value=DEFAULTS.rules;
+  document.getElementById('sampleRequest').value=DEFAULTS.request;
+  document.getElementById('sampleResponse').value=DEFAULTS.response;
+  buildRuleRef();
+  await loadConfig();
+  await newSession();
+  ['m_id','m_age','m_meCode','m_tanf','m_snap','m_formerInmate','m_childCaretaker','m_disabledCaretaker','m_incarceration','m_releaseDate','m_detDate'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.addEventListener('change',updateReqPreview);
+  });
+  updateReqPreview();
+  document.getElementById('sampleRequest').addEventListener('input',()=>validateJSON('sampleRequest','reqJsonAlert'));
+  document.getElementById('sampleResponse').addEventListener('input',()=>validateJSON('sampleResponse','respJsonAlert'));
+
+  // Drag-and-drop on upload zone
+  const zone=document.getElementById('uploadZone');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag')});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');
+    const f=e.dataTransfer.files[0];if(f){document.getElementById('rulesFileInput').files=e.dataTransfer.files;handleRulesUpload({target:{files:[f]}});}
+  });
+}
+
+/* ── File Upload ── */
+function handleRulesUpload(event){
+  const file=event.target.files[0];if(!file)return;
+  const lbl=document.getElementById('uploadLabel');
+  if(!file.name.match(/\.(txt|md)$/i)){lbl.textContent='⚠ Only .txt or .md files supported';lbl.style.color='var(--amber)';return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById('rulesText').value=e.target.result;
+    lbl.textContent=`✅ ${file.name}  (${(file.size/1024).toFixed(1)} KB)`;
+    lbl.style.color='var(--green)';
+  };
+  reader.onerror=()=>{lbl.textContent='❌ Failed to read file';lbl.style.color='var(--red)';};
+  reader.readAsText(file);
+}
+
+function clearRules(){
+  document.getElementById('rulesText').value='';
+  const lbl=document.getElementById('uploadLabel');
+  lbl.textContent='Click to upload, or drag & drop a .txt / .md file';lbl.style.color='';
+  document.getElementById('rulesFileInput').value='';
+  document.getElementById('chunkInfo').textContent='';
+  showAlert('indexAlert','','');
+}
+
+/* ── Session ── */
+async function newSession(){
+  if(sseSource){sseSource.close();sseSource=null;}
+  const data=await fetch('/api/session/new',{method:'POST'}).then(r=>r.json());
+  SESSION_ID=data.session_id;
+  document.getElementById('sideSessionId').textContent=SESSION_ID.slice(0,8)+'…';
+  updateSidebar({rules:false,pipeline:'Idle',count:'—'});
+  await checkPipelineReady();
+}
+
+function updateSidebar({rules,pipeline,count}){
+  const r=document.getElementById('sideRulesStatus'),p=document.getElementById('sidePipelineStatus'),c=document.getElementById('sideTestCount');
+  if(rules!==undefined){r.textContent=rules?'Indexed ✓':'Not indexed';r.className='sv '+(rules?'ok':'warn')}
+  if(pipeline!==undefined){p.textContent=pipeline;p.className='sv '+(pipeline==='Done'?'ok':pipeline==='Error'?'err':pipeline==='Running'?'warn':'')}
+  if(count!==undefined)c.textContent=count;
+}
+
+/* ── Config ── */
+async function loadConfig(){
+  const cfg=await fetch('/api/config').then(r=>r.json());
+  document.getElementById('apiDot').className=cfg.api_key_set?'dot':'dot off';
+  document.getElementById('apiLabel').textContent=cfg.api_key_set?'API Key Set':'API Key Missing';
+  document.getElementById('modelLabel').textContent=cfg.model||'gpt-4o-mini';
+  return cfg;
+}
+
+/* ── Tabs ── */
+function switchTab(tab,el){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(el)el.classList.add('active');
+}
+
+/* ── Rules Indexing ── */
+async function indexRules(){
+  const rules=document.getElementById('rulesText').value.trim();
+  let sampleReq,sampleResp;
+  try{sampleReq=JSON.parse(document.getElementById('sampleRequest').value);sampleResp=JSON.parse(document.getElementById('sampleResponse').value);}
+  catch(e){showAlert('indexAlert','error','Invalid JSON in sample request/response: '+e.message);return;}
+  if(!rules){showAlert('indexAlert','error','Rules text is required');return;}
+  showAlert('indexAlert','info','Indexing rules into FAISS vector DB…');
+  try{
+    const res=await fetch('/api/rules/index',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:SESSION_ID,rules_text:rules,sample_request:sampleReq,sample_response:sampleResp})});
+    const data=await res.json();
+    if(res.ok){showAlert('indexAlert','success',data.message);document.getElementById('chunkInfo').textContent=`${data.chunks} chunks indexed · FAISS ready`;updateSidebar({rules:true});await checkPipelineReady();}
+    else showAlert('indexAlert','error',data.detail||'Indexing failed');
+  }catch(e){showAlert('indexAlert','error','Network error: '+e.message);}
+}
+
+/* ── Vector Search — filters out full-document chunk ── */
+async function searchRules(){
+  const query=document.getElementById('searchQuery').value.trim();
+  if(!query)return;
+  const res=await fetch(`/api/rules/search?session_id=${SESSION_ID}&query=${encodeURIComponent(query)}&top_k=3`);
+  const container=document.getElementById('searchResults');
+  if(!res.ok){container.innerHTML='<div class="alert alert-warn"><span class="alert-icon">⚠️</span>Index rules first.</div>';return;}
+  const data=await res.json();
+  // Only show individual rule chunks, not the full-document chunk
+  const hits=data.results.filter(r=>r.type!=='full');
+  if(!hits.length){container.innerHTML='<div class="txt-muted" style="margin-top:4px">No matching rule chunks found.</div>';return;}
+  container.innerHTML=hits.map((r,i)=>`
+    <div class="search-hit">
+      <div class="search-hit-label">Match ${i+1} · score ${r.score.toFixed(3)} · ${escHtml(r.rule_id||'')}</div>${escHtml(r.text)}
+    </div>`).join('');
+}
+
+function validateJSON(tid,aid){
+  try{JSON.parse(document.getElementById(tid).value);showAlert(aid,'','');}
+  catch(e){showAlert(aid,'error','JSON error: '+e.message);}
+}
+
+/* ── Pipeline ── */
+async function checkPipelineReady(){
+  const btn=document.getElementById('runBtn'),precheck=document.getElementById('pipelinePrecheck');
+  const [cfg,rs]=await Promise.all([
+    fetch('/api/config').then(r=>r.json()),
+    fetch(`/api/rules/status?session_id=${SESSION_ID}`).then(r=>r.json()).catch(()=>({indexed:false}))
+  ]);
+  const issues=[];
+  if(!cfg.api_key_set)issues.push('OPENAI_API_KEY not set in .env');
+  if(!rs.indexed)issues.push('Rules not yet indexed — go to Setup tab');
+  if(issues.length){
+    precheck.innerHTML=issues.map(i=>`<div class="alert alert-warn" style="margin-bottom:6px"><span class="alert-icon">⚠️</span>${i}</div>`).join('');
+    btn.disabled=true;
+  }else{
+    precheck.innerHTML='<div class="alert alert-success" style="margin-bottom:12px"><span class="alert-icon">✅</span>Ready — API key configured, rules indexed</div>';
+    btn.disabled=false;
+  }
+}
+
+async function runPipeline(){
+  if(!SESSION_ID)return;
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('logBox').innerHTML='';
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('progressPct').textContent='0%';
+  updateSidebar({pipeline:'Running'});
+  await fetch('/api/pipeline/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID})});
+  if(sseSource)sseSource.close();
+  sseSource=new EventSource(`/api/pipeline/stream/${SESSION_ID}`);
+  sseSource.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.error){appendLog('ERROR: '+d.error,true,false);sseSource.close();return;}
+    if(d.done){sseSource.close();
+      if(d.status==='done'){appendLog('Pipeline complete!',false,true);updateSidebar({pipeline:'Done'});loadResults();}
+      else{appendLog('Pipeline failed.',true,false);updateSidebar({pipeline:'Error'});document.getElementById('runBtn').disabled=false;}
+      return;}
+    appendLog(d.msg,false,false);
+    document.getElementById('progressBar').style.width=d.pct+'%';
+    document.getElementById('progressPct').textContent=d.pct+'%';
+  };
+}
+
+function appendLog(msg,isErr,isDone){
+  const box=document.getElementById('logBox');
+  const line=document.createElement('span');
+  line.className='log-line'+(isErr?' err':isDone?' done':' active');
+  const ts=new Date().toTimeString().slice(0,8);
+  line.innerHTML=`<span class="ts">[${ts}]</span> ${escHtml(msg)}\n`;
+  box.appendChild(line);box.scrollTop=box.scrollHeight;
+}
+
+/* ── Results ── */
+async function loadResults(){
+  const res=await fetch(`/api/results/${SESSION_ID}`);if(!res.ok)return;
+  const data=await res.json();allResults=data.results;
+  renderResults(allResults,data.stats);
+  switchTab('results',document.querySelector('[data-tab=results]'));
+  const badge=document.getElementById('resultBadge');badge.textContent=allResults.length;badge.style.display='';
+  updateSidebar({count:allResults.length});
+}
+
+function renderResults(results,stats){
+  document.getElementById('noResults').style.display='none';
+  document.getElementById('resultsContent').style.display='flex';
+  const pct=stats.pass_rate.toFixed(1);
+  document.getElementById('metricsGrid').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Total Cases</div><div class="metric-value">${stats.total}</div><div class="metric-sub">Executed</div></div>
+    <div class="metric-card pass"><div class="metric-label">✅ Passed</div><div class="metric-value">${stats.passed}</div><div class="metric-sub">${pct}% pass rate</div></div>
+    <div class="metric-card fail"><div class="metric-label">❌ Failed</div><div class="metric-value">${stats.failed}</div><div class="metric-sub">Need review</div></div>
+    <div class="metric-card invalid"><div class="metric-label">⚠️ Invalid</div><div class="metric-value">${stats.invalid}</div><div class="metric-sub">Data issues</div></div>
+    <div class="metric-card rate"><div class="metric-label">Pass Rate</div><div class="metric-value">${pct}%</div><div class="metric-sub">Overall</div></div>`;
+  const mx=Math.max(...Object.values(stats.by_rule).map(v=>v.total),1);
+  const ruleRows=Object.entries(stats.by_rule).map(([rule,v])=>`
+    <div class="bar-row">
+      <div class="bar-label" title="${rule}">${rule.slice(0,26)}</div>
+      <div class="bar-track"><div class="bar-fill pass" style="width:${v.pass/mx*100}%"></div></div>
+      <div class="bar-count" style="color:var(--green)">${v.pass}</div>
+      <div class="bar-track" style="max-width:46px"><div class="bar-fill fail" style="width:${v.fail/mx*100}%"></div></div>
+      <div class="bar-count" style="color:var(--red)">${v.fail}</div>
+    </div>`).join('');
+  const mx2=Math.max(...Object.values(stats.by_type).map(v=>v.total),1);
+  const typeRows=Object.entries(stats.by_type).map(([t,v])=>`
+    <div class="bar-row"><div class="bar-label">${t}</div><div class="bar-track"><div class="bar-fill total" style="width:${v.total/mx2*100}%"></div></div><div class="bar-count">${v.total}</div></div>`).join('');
+  document.getElementById('chartsRow').innerHTML=`
+    <div class="chart-box">
+      <div class="chart-title">Pass / Fail by Rule <span style="color:var(--green);margin-left:6px">■ Pass</span><span style="color:var(--red);margin-left:6px">■ Fail</span></div>
+      <div class="bar-chart">${ruleRows}</div>
+    </div>
+    <div class="chart-box"><div class="chart-title">Total by Test Type</div><div class="bar-chart">${typeRows}</div></div>`;
+  renderTable(results);
+}
+
+function renderTable(results){
+  const tbody=document.getElementById('resultsTableBody');
+  if(!results.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state">No matching results</div></td></tr>`;document.getElementById('tableCaption').textContent='';return;}
+  tbody.innerHTML=results.map(r=>{
+    const vs=r.verification_status||'';
+    const chip=vs==='PASS'?'chip-pass':vs==='FAIL'?'chip-fail':'chip-invalid';
+    const tc=r.test_type==='positive'?'chip-positive':r.test_type==='negative'?'chip-negative':r.test_type==='edge_case'?'chip-edge':'chip-invdata';
+    return `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:.68rem;white-space:nowrap;color:var(--blue)">${escHtml(r.test_case_id||'')}</td>
+      <td style="max-width:190px;color:var(--tx)">${escHtml(r.test_case_name||'')}</td>
+      <td style="max-width:140px;font-size:.7rem">${escHtml(r.rule_being_tested||'')}</td>
+      <td><span class="chip ${tc}">${escHtml(r.test_type||'')}</span></td>
+      <td style="font-size:.72rem">${escHtml(r.expected_exemption_status||'')}</td>
+      <td style="font-size:.72rem">${escHtml(r.actual_exemption_status||'')}</td>
+      <td><span class="chip ${chip}">${vs}</span></td>
+      <td><button class="btn btn-ghost" style="font-size:.7rem;padding:3px 8px;border:1px solid var(--border)" onclick='openDrawer(${JSON.stringify(r).replace(/'/g,"&apos;")})'>Detail</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableCaption').textContent=`Showing ${results.length} of ${allResults.length} test cases`;
+}
+
+function toggleFilter(el){
+  const f=el.dataset.filter;
+  if(f==='ALL'){activeFilters=new Set(['ALL']);document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+  else{
+    activeFilters.delete('ALL');document.querySelector('.filter-chip.all').classList.remove('active');
+    if(activeFilters.has(f)){activeFilters.delete(f);el.classList.remove('active');}else{activeFilters.add(f);el.classList.add('active');}
+    if(!activeFilters.size){activeFilters.add('ALL');document.querySelector('.filter-chip.all').classList.add('active');}
+  }
+  applyFilters();
+}
+
+function applyFilters(){
+  const s=(document.getElementById('searchFilter').value||'').toLowerCase();
+  renderTable(allResults.filter(r=>(activeFilters.has('ALL')||activeFilters.has(r.verification_status||''))&&(!s||JSON.stringify(r).toLowerCase().includes(s))));
+}
+
+async function downloadExcel(){window.location.href=`/api/results/${SESSION_ID}/download`;}
+function downloadJSON(){
+  const blob=new Blob([JSON.stringify(allResults,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`test_results_${new Date().toISOString().slice(0,16).replace(/:/g,'-')}.json`;a.click();
+}
+
+/* ── Drawer ── */
+function openDrawer(result){
+  const vs=result.verification_status||'';
+  const chip=vs==='PASS'?'chip-pass':vs==='FAIL'?'chip-fail':'chip-invalid';
+  document.getElementById('drawerTitle').textContent=`${result.test_case_id} — ${result.test_case_name||''}`;
+  document.getElementById('drawerBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:13px">
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <span class="chip ${chip}" style="font-size:.78rem;padding:4px 11px">${vs}</span>
+        <span class="pill pill-blue">${escHtml(result.test_type||'')}</span>
+        <span class="pill pill-amber">${escHtml(result.rule_being_tested||'')}</span>
+      </div>
+      <div class="alert ${vs==='PASS'?'alert-success':vs==='FAIL'?'alert-error':'alert-warn'}">
+        <span class="alert-icon">${vs==='PASS'?'✅':vs==='FAIL'?'❌':'⚠️'}</span>
+        <div><b>Description:</b> ${escHtml(result.description||'—')}</div>
+      </div>
+      ${result.failure_reason?`<div class="alert alert-error"><span class="alert-icon">🔎</span><div><b>Failure Reason:</b> ${escHtml(result.failure_reason)}</div></div>`:''}
+      <div class="two-col" style="gap:11px">
+        <div>
+          <div style="font-size:.66rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Expected</div>
+          <table style="width:100%;font-size:.74rem;border-collapse:collapse">
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Exemption</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.expected_exemption_status||'—')}</td></tr>
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Reason</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.expected_exemption_reason||'—')}</td></tr>
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Rule</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.expected_rule_fired||'—')}</td></tr>
+          </table>
+        </div>
+        <div>
+          <div style="font-size:.66rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Actual</div>
+          <table style="width:100%;font-size:.74rem;border-collapse:collapse">
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Exemption</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.actual_exemption_status||'—')}</td></tr>
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Reason</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.actual_exemption_reason||'—')}</td></tr>
+            <tr><td style="padding:4px 0;color:var(--tx-muted)">Rule</td><td style="font-weight:600;color:var(--tx)">${escHtml(result.actual_rule_fired||'—')}</td></tr>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.66rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Request JSON</div>
+        <div class="json-block">${escHtml(JSON.stringify(result.request_json||{},null,2))}</div>
+      </div>
+      <div>
+        <div style="font-size:.66rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Response JSON</div>
+        <div class="json-block">${escHtml(JSON.stringify(result.response_json||{},null,2))}</div>
+      </div>
+    </div>`;
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('detailDrawer').classList.add('open');
+}
+function closeDrawer(){document.getElementById('drawerOverlay').classList.remove('open');document.getElementById('detailDrawer').classList.remove('open');}
+
+/* ── Manual Tester ── */
+function buildManualReq(){
+  return{id:document.getElementById('m_id').value,tanf:document.getElementById('m_tanf').checked,snap:document.getElementById('m_snap').checked,
+    age:parseInt(document.getElementById('m_age').value)||0,meCode:document.getElementById('m_meCode').value||null,exemptionStatus:null,
+    caretakerOfChildUnder13:document.getElementById('m_childCaretaker').checked,incarcerationStatus:document.getElementById('m_incarceration').checked,
+    formerInmate:document.getElementById('m_formerInmate').checked,releaseDate:document.getElementById('m_releaseDate').value||null,
+    determinationDate:document.getElementById('m_detDate').value||null,caretakerOfDisabledIndividualFlag:document.getElementById('m_disabledCaretaker').checked};
+}
+function updateReqPreview(){document.getElementById('reqPreview').textContent=JSON.stringify(buildManualReq(),null,2);}
+
+async function manualExecute(){
+  const req=buildManualReq();
+  const data=await fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request:req})}).then(r=>r.json());
+  const resp=data.response;
+  const isExempt=resp.exemptionStatus==='Exempt',isErr=resp.status==='ERROR'||resp.status==='INVALID_DATA';
+  const ac=isErr?'alert-error':isExempt?'alert-success':'alert-warn',icon=isErr?'❌':isExempt?'✅':'⚠️';
+  document.getElementById('manualResponse').innerHTML=`
+    <div class="alert ${ac}" style="margin-bottom:11px">
+      <span class="alert-icon">${icon}</span>
+      <div><b>${escHtml(resp.exemptionStatus||resp.status)}</b>${resp.exemptionReason?` — ${escHtml(resp.exemptionReason)}`:''}
+      ${resp.ruleFired?`<br><span style="font-size:.7rem;color:var(--tx-muted)">Rule: <code style="color:var(--cyan)">${escHtml(resp.ruleFired)}</code></span>`:''}</div>
+    </div>
+    <div style="font-size:.66rem;font-weight:700;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Response JSON</div>
+    <div class="json-block">${escHtml(JSON.stringify(resp,null,2))}</div>`;
+}
+
+function buildRuleRef(){
+  document.getElementById('ruleRef').innerHTML=RULES_REF.map(r=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${r.color};color:#000;font-size:.62rem;font-weight:900;flex-shrink:0;box-shadow:0 0 7px ${r.color}55">${r.num}</span>
+      <span style="font-weight:600;font-size:.78rem;min-width:110px;color:var(--tx)">${r.name}</span>
+      <code style="font-size:.68rem;color:var(--tx-muted);font-family:'JetBrains Mono',monospace">${r.cond}</code>
+    </div>`).join('');
+}
+
+function showAlert(targetId,type,msg){
+  const el=document.getElementById(targetId);if(!el)return;
+  if(!type||!msg){el.innerHTML='';return;}
+  const cls={info:'alert-info',success:'alert-success',warn:'alert-warn',error:'alert-error'}[type]||'alert-info';
+  const icon={info:'ℹ️',success:'✅',warn:'⚠️',error:'❌'}[type];
+  el.innerHTML=`<div class="alert ${cls}" style="margin-top:4px"><span class="alert-icon">${icon}</span><div>${escHtml(msg)}</div></div>`;
+}
+
+function escHtml(str){
+  if(str===null||str===undefined)return'';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.addEventListener('DOMContentLoaded',init);
+window.addEventListener('beforeunload',()=>{if(SESSION_ID)navigator.sendBeacon(`/api/session/${SESSION_ID}`,JSON.stringify({method:'DELETE'}));});
+</script>
+</body>
+</html>

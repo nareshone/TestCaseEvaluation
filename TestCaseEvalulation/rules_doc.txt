@@ -1,0 +1,25 @@
+Below rules are listed in priority wise. Exemption will be happened based on the priority.
+1. TANF
+if TANF_Flag==TRUE -> Exempt (Reason: TANF Work Requirements Compliance)
+Else -> Not Exempt (Continue to next rule)
+
+2. SNAP
+If SNAP_FLAG==TRUE -> Exempt (Reason: SNAP Household)
+Else -> Not Exempt (Continue to next rule)
+
+3. Under 19 Individual
+If age<19: return Exempt (Reason: Under 19)
+else: return Not Exempt (Continue to next rule)
+
+4. Exemption: Former Inmate within 3-Month lookback (Grace Period)
+A former inmate is Exempt if their release date is within 3 months prior to the determination date.
+If FormerInmateFlag=True and releaseDate between AsOfDate - 3 months and AsOfDate then Exempt (Reason: Former Inmate - 3-month grace)
+else Not Exempt (Continue to next rule)
+
+5. Exemption: Child Caregiver
+If CaretakerOfChildUnder13_Flag==True -> Exempt (Reason: Child Caregiver)
+Else Not Exempt (Continue to next rule)
+
+6. Exemption: Disabled Individual Caregiver
+If CaretakerOfDisabledIndividualFlag==True -> Exempt (Reason: Disabled Individual Caregiver)
+Else Not Exempt
