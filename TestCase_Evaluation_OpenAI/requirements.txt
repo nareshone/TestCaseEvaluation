@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────
+# CEV Rules Test Portal — requirements.txt
+# Target install size: ~105 MB  (was ~740 MB with crewai)
+# ─────────────────────────────────────────────────────────────
+
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
+# LLM — direct OpenAI SDK only (no crewai, no langchain, no torch)
+openai>=1.0.0
+
+# Vector DB
+faiss-cpu>=1.7.4
+numpy>=1.24.0
+
+# Excel report generation
+openpyxl>=3.1.2
+
+# Config / environment
+python-dotenv>=1.0.0
+
+# ─────────────────────────────────────────────────────────────
+# REMOVED (were unused or brought in massive transitive deps):
+#   crewai              — pulled torch (~300 MB) + chromadb (~80 MB)
+#   langchain           — no longer needed; direct OpenAI calls used instead
+#   langchain-openai    — no longer needed
+#   langchain-community — was never imported
+#   pandas              — was never imported (openpyxl handles Excel)
+#   tiktoken            — was never imported
+#   python-multipart    — UploadFile imported but never used in any route
+#   sentence-transformers — was never imported
+# ─────────────────────────────────────────────────────────────
