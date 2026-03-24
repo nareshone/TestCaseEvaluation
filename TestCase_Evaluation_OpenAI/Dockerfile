@@ -34,17 +34,17 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy application source code
-COPY --chown=appuser:appuser agents.py        .
-COPY --chown=appuser:appuser config.py        .
-COPY --chown=appuser:appuser main.py          .
-COPY --chown=appuser:appuser mock_api.py      .
-COPY --chown=appuser:appuser vector_store.py  .
+COPY --chown=appuser:appuser agents.py         .
+COPY --chown=appuser:appuser config.py         .
+COPY --chown=appuser:appuser main.py           .
+COPY --chown=appuser:appuser mock_api.py       .
+COPY --chown=appuser:appuser vector_store.py   .
 COPY --chown=appuser:appuser excel_reporter.py .
-COPY --chown=appuser:appuser templates/       templates/
-COPY --chown=appuser:appuser static/          static/
+COPY --chown=appuser:appuser templates/        templates/
 
-# Create runtime directories with correct ownership
-RUN mkdir -p data/faiss_store outputs \
+# static/ folder has no files — create it here so no COPY error
+# data/ and outputs/ are runtime directories, also created here
+RUN mkdir -p static data/faiss_store outputs \
     && chown -R appuser:appuser /app
 
 # Switch to non-root user
@@ -59,5 +59,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     || exit 1
 
 # Start the server
-# reload=False in production — use --reload only for local dev
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
