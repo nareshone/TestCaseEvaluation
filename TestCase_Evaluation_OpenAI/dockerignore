@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────
+# .dockerignore — files excluded from the Docker build context
+# Keeps the image lean and avoids leaking secrets
+# ─────────────────────────────────────────────────────────────
+
+# Python cache — never needed in the image
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env.local
+.env.*.local
+
+# IMPORTANT: exclude .env so secrets are never baked into the image.
+# Pass it at runtime via docker-compose env_file or -e flags instead.
+.env
+
+# Runtime data directories — these are mounted as volumes
+data/
+outputs/
+
+# Development / IDE files
+.git/
+.gitignore
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Test artefacts
+*.xlsx
+*.bak
+
+# Docs
+README.md
