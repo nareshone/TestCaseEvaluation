@@ -1,9 +1,13 @@
 """
-mock_api.py - Mock API executor with pre-built sample responses for demo/testing
+mock_api.py - API executor: calls a real HTTP endpoint when configured, 
+              falls back to built-in mock rules for demo/testing.
 """
 import json
+import urllib.request
+import urllib.error
+import ssl
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def determine_exemption(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,6 +97,73 @@ def determine_exemption(request: Dict[str, Any]) -> Dict[str, Any]:
         "exemptionReason": "No exemption criteria met",
         "ruleFired": "None"
     }
+
+
+def execute_real_request(
+    request_json: Dict[str, Any],
+    api_url: str,
+    bearer_token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Execute a request against a real HTTP API endpoint.
+    Returns the parsed JSON response, or an error dict on failure.
+    """
+    try:
+        payload = json.dumps(request_json).encode("utf-8")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        # Only add Authorization header if token is a non-empty, non-whitespace string
+        clean_token = (bearer_token or "").strip()
+        if clean_token:
+            headers["Authorization"] = f"Bearer {clean_token}"
+
+        # Create an SSL context that tolerates self-signed/dev certs
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        req = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            raw = resp.read().decode("utf-8")
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return {
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "ERROR",
+                    "exemptionStatus": None,
+                    "exemptionReason": f"Non-JSON response from API: {raw[:200]}",
+                    "ruleFired": None,
+                }
+
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8")
+        except Exception:
+            pass
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "status": "ERROR",
+            "exemptionStatus": None,
+            "exemptionReason": f"HTTP {e.code} {e.reason}: {body[:300]}",
+            "ruleFired": None,
+        }
+    except urllib.error.URLError as e:
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "status": "ERROR",
+            "exemptionStatus": None,
+            "exemptionReason": f"Connection error: {e.reason}",
+            "ruleFired": None,
+        }
+    except Exception as e:
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "status": "ERROR",
+            "exemptionStatus": None,
+            "exemptionReason": f"Unexpected error: {str(e)}",
+            "ruleFired": None,
+        }
 
 
 def execute_request(request_json: Dict[str, Any]) -> Dict[str, Any]:

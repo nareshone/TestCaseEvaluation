@@ -39,6 +39,33 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+# ── Global handlers: always return JSON, never HTML ──
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_err(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": str(exc.detail), "status_code": exc.status_code},
+    )
+
+@app.exception_handler(RequestValidationError)
+async def _validation_err(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"error": f"Validation error: {exc}", "status_code": 422},
+    )
+
+@app.exception_handler(Exception)
+async def _generic_err(request: Request, exc: Exception):
+    import traceback; traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"error": f"Internal server error: {str(exc)}", "status_code": 500},
+    )
+
 # ── In-memory session store ──
 # Each session_id maps to: { vector_store, results, excel_path, status, logs }
 _sessions: Dict[str, Dict[str, Any]] = {}
@@ -57,6 +84,8 @@ def get_or_create_session(session_id: str) -> Dict[str, Any]:
             "pipeline_pct": 0,
             "sample_request": None,
             "sample_response": None,
+            "api_url": None,
+            "bearer_token": None,
         }
     return _sessions[session_id]
 
@@ -124,29 +153,40 @@ async def get_config():
 
 @app.post("/api/rules/index")
 async def index_rules(request: Request):
-    body = await request.json()
-    session_id = body.get("session_id")
-    rules_text = body.get("rules_text", "").strip()
-    sample_request = body.get("sample_request")
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    session_id   = (body.get("session_id") or "").strip() or None
+    rules_text   = (body.get("rules_text") or "").strip()
+    sample_request  = body.get("sample_request")
     sample_response = body.get("sample_response")
+    api_url      = (body.get("api_url") or "").strip() or None
+    bearer_token = (body.get("bearer_token") or "").strip() or None
 
     if not session_id:
-        raise HTTPException(400, "session_id required")
+        return JSONResponse({"error": "session_id required"}, status_code=400)
     if not rules_text:
-        raise HTTPException(400, "rules_text required")
+        return JSONResponse({"error": "rules_text required"}, status_code=400)
 
-    sess = get_or_create_session(session_id)
+    try:
+        sess = get_or_create_session(session_id)
+        clear_session_vector_store(session_id)
+        sess["sample_request"]  = sample_request
+        sess["sample_response"] = sample_response
+        sess["api_url"]         = api_url
+        sess["bearer_token"]    = bearer_token
 
-    # Always clear and rebuild — replaces old content
-    clear_session_vector_store(session_id)
-    sess["sample_request"] = sample_request
-    sess["sample_response"] = sample_response
+        vs    = sess["vector_store"]
+        count = vs.build_index(rules_text)
+        sess["rules_indexed"] = True
 
-    vs = sess["vector_store"]
-    count = vs.build_index(rules_text)
-    sess["rules_indexed"] = True
-
-    return {"status": "indexed", "chunks": count, "message": f"Indexed {count} rule chunks into FAISS"}
+        return JSONResponse({"status": "indexed", "chunks": count,
+                             "message": f"Indexed {count} rule chunks into FAISS"})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JSONResponse({"error": f"Indexing failed: {str(e)}"}, status_code=500)
 
 
 @app.get("/api/rules/search")
@@ -154,9 +194,12 @@ async def search_rules(session_id: str, query: str, top_k: int = 3):
     sess = get_or_create_session(session_id)
     vs = sess.get("vector_store")
     if not vs or not vs.is_ready():
-        raise HTTPException(400, "Rules not indexed yet")
-    results = vs.search(query, top_k=top_k)
-    return {"results": results}
+        return JSONResponse({"error": "Rules not indexed yet"}, status_code=400)
+    try:
+        results = vs.search(query, top_k=top_k)
+        return JSONResponse({"results": results})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/rules/status")
@@ -171,10 +214,63 @@ async def rules_status(session_id: str):
 
 @app.post("/api/execute")
 async def manual_execute(request: Request):
-    body = await request.json()
-    req_payload = body.get("request", {})
-    response = execute_request(req_payload)
-    return {"request": req_payload, "response": response}
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    req_payload  = body.get("request", {})
+    api_url      = (body.get("api_url") or "").strip() or None
+    bearer_token = (body.get("bearer_token") or "").strip() or None
+
+    try:
+        if api_url:
+            from mock_api import execute_real_request
+            response = execute_real_request(req_payload, api_url, bearer_token)
+        else:
+            response = execute_request(req_payload)
+    except Exception as e:
+        import datetime as _dt
+        response = {
+            "timestamp": _dt.datetime.now().isoformat(),
+            "status": "ERROR",
+            "exemptionStatus": None,
+            "exemptionReason": str(e),
+            "ruleFired": None,
+        }
+
+    return JSONResponse({
+        "request": req_payload,
+        "response": response,
+        "used_real_api": bool(api_url),
+        "api_url": api_url,
+    })
+
+
+@app.post("/api/test-connection")
+async def test_connection(request: Request):
+    """Ping the configured API URL with a minimal payload to verify connectivity and auth."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    api_url      = (body.get("api_url") or "").strip() or None
+    bearer_token = (body.get("bearer_token") or "").strip() or None
+    sample_req   = body.get("sample_request") or {"id": "connection-test"}
+
+    if not api_url:
+        return JSONResponse({"ok": False, "error": "api_url is required", "response": None})
+
+    try:
+        from mock_api import execute_real_request
+        response = execute_real_request(sample_req, api_url, bearer_token)
+    except Exception as e:
+        return JSONResponse({"ok": False, "api_url": api_url,
+                             "response": {"status": "ERROR", "exemptionReason": str(e)}})
+
+    ok = response.get("status") not in ("ERROR",)
+    return JSONResponse({"ok": ok, "api_url": api_url, "response": response})
 
 
 # ──────────────────────────────────────────────
@@ -214,6 +310,8 @@ def _run_pipeline_thread(session_id: str):
             sample_request=sample_req,
             sample_response=sample_resp,
             progress_callback=log,
+            api_url=sess.get("api_url"),
+            bearer_token=sess.get("bearer_token"),
         )
 
         # Generate Excel
@@ -235,20 +333,33 @@ def _run_pipeline_thread(session_id: str):
 
 @app.post("/api/pipeline/start")
 async def start_pipeline(request: Request):
-    body = await request.json()
-    session_id = body.get("session_id")
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+    session_id = (body.get("session_id") or "").strip() or None
     if not session_id:
-        raise HTTPException(400, "session_id required")
+        return JSONResponse({"error": "session_id required"}, status_code=400)
 
     sess = get_or_create_session(session_id)
     if sess["pipeline_status"] == "running":
-        raise HTTPException(409, "Pipeline already running")
+        return JSONResponse({"error": "Pipeline already running"}, status_code=409)
+
+    # Allow overriding api_url / bearer_token at run time
+    if "api_url" in body:
+        sess["api_url"] = (body.get("api_url") or "").strip() or None
+    if "bearer_token" in body:
+        sess["bearer_token"] = (body.get("bearer_token") or "").strip() or None
+
+    sess = get_or_create_session(session_id)
+    if sess["pipeline_status"] == "running":
+        return JSONResponse({"error": "Pipeline already running"}, status_code=409)
 
     sess["pipeline_status"] = "running"
     t = threading.Thread(target=_run_pipeline_thread, args=(session_id,), daemon=True)
     _pipeline_threads[session_id] = t
     t.start()
-    return {"status": "started"}
+    return JSONResponse({"status": "started"})
 
 
 @app.get("/api/pipeline/stream/{session_id}")
@@ -298,10 +409,13 @@ async def get_results(session_id: str):
     sess = get_or_create_session(session_id)
     results = sess.get("results")
     if results is None:
-        raise HTTPException(404, "No results yet")
+        return JSONResponse({"error": "No results yet"}, status_code=404)
 
-    stats = compute_summary_stats(results)
-    return {"results": results, "stats": stats}
+    try:
+        stats = compute_summary_stats(results)
+        return JSONResponse({"results": results, "stats": stats})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/results/{session_id}/download")
@@ -309,7 +423,7 @@ async def download_excel(session_id: str):
     sess = get_or_create_session(session_id)
     excel_path = sess.get("excel_path")
     if not excel_path or not Path(excel_path).exists():
-        raise HTTPException(404, "Excel report not found")
+        return JSONResponse({"error": "Excel report not found"}, status_code=404)
     fname = Path(excel_path).name
     return FileResponse(
         excel_path,

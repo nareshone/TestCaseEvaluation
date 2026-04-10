@@ -230,16 +230,28 @@ Return ONLY a valid JSON array. No markdown, no explanation."""
 # AGENT 3 — API Executor  (no LLM needed — pure Python)
 # ─────────────────────────────────────────────────────────────
 
-def agent_execute_requests(requests_list: List[Dict]) -> List[Dict]:
+def agent_execute_requests(
+    requests_list: List[Dict],
+    api_url: Optional[str] = None,
+    bearer_token: Optional[str] = None,
+) -> List[Dict]:
     """
-    Execute each request payload against the mock API.
+    Execute each request payload against either a real API endpoint or the mock.
     This agent is pure Python — no LLM call needed.
     """
+    from mock_api import execute_real_request
+
+    use_real = bool(api_url and api_url.strip())
     results = []
     for item in requests_list:
         tc_id = item.get("test_case_id", "")
         req   = item.get("request_json", {})
-        resp  = execute_request(req)
+
+        if use_real:
+            resp = execute_real_request(req, api_url.strip(), bearer_token)
+        else:
+            resp = execute_request(req)
+
         results.append({
             "test_case_id":  tc_id,
             "request_json":  req,
@@ -336,9 +348,13 @@ def run_test_pipeline(
     sample_request: dict,
     sample_response: dict,
     progress_callback=None,
+    api_url: Optional[str] = None,
+    bearer_token: Optional[str] = None,
 ) -> List[Dict]:
     """
     Run the full 4-agent test pipeline using direct OpenAI calls.
+    If api_url is provided, requests are sent to that real endpoint.
+    Otherwise the built-in mock rules engine is used.
     progress_callback(message: str, pct: int)
     """
 
@@ -355,6 +371,9 @@ def run_test_pipeline(
     if not rules_text.strip():
         raise ValueError("Rules not indexed — index rules in the Setup tab first.")
 
+    use_real_api = bool(api_url and api_url.strip())
+    api_label = api_url.strip() if use_real_api else "mock engine"
+
     # ── Step 1: Generate test cases ──────────────────────────
     log("Agent 1 — Generating test cases from rules...", 10)
     test_cases = agent_generate_test_cases(rules_text, sample_request, sample_response)
@@ -366,8 +385,8 @@ def run_test_pipeline(
     log(f"Agent 2 — Built {len(requests_list)} request payloads", 52)
 
     # ── Step 3: Execute requests (no LLM) ────────────────────
-    log("Agent 3 — Executing requests against mock API...", 58)
-    execution_results = agent_execute_requests(requests_list)
+    log(f"Agent 3 — Executing {len(requests_list)} requests against {api_label}...", 58)
+    execution_results = agent_execute_requests(requests_list, api_url=api_url, bearer_token=bearer_token)
     log(f"Agent 3 — Executed {len(execution_results)} requests", 72)
 
     # ── Step 4: Verify results ────────────────────────────────

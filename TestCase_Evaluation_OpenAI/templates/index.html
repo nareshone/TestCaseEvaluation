@@ -375,6 +375,34 @@ tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
           <textarea id="sampleResponse" rows="7" placeholder='{"status":"SUCCESS","exemptionStatus":"Exempt",...}'></textarea>
           <div id="respJsonAlert" style="margin-top:6px"></div>
         </div>
+
+        <div class="card card-glow" id="apiConfigCard">
+          <div class="card-title"><span class="step-num">4</span>API Endpoint <span style="font-size:.64rem;font-weight:500;color:var(--tx-muted);margin-left:6px">optional</span></div>
+          <div style="margin-bottom:11px">
+            <label>API URL <span class="txt-muted">— leave blank to use built-in mock engine</span></label>
+            <input type="text" id="apiUrl"
+              placeholder="https://api-drools-cev.shared.dev.net/cev/drools/api/v1/rules"
+              oninput="onApiUrlChange()" style="font-family:'JetBrains Mono',monospace;font-size:.74rem"/>
+          </div>
+          <div style="margin-bottom:13px">
+            <label style="display:flex;align-items:center;gap:6px">
+              Bearer Token
+              <span class="txt-muted">(optional — sent as <code style="background:rgba(255,255,255,.07);padding:1px 4px;border-radius:3px">Authorization: Bearer …</code>)</span>
+            </label>
+            <div style="position:relative">
+              <input type="password" id="bearerToken" placeholder="eyJhbGciOiJSUzI1NiJ9…" style="padding-right:42px"/>
+              <button onclick="toggleTokenVisibility()" id="tokenToggleBtn"
+                style="position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--tx-muted);font-size:.8rem;padding:3px 6px;border-radius:4px;"
+                title="Show/hide token">👁</button>
+            </div>
+          </div>
+          <div id="apiStatusBanner" style="margin-bottom:11px"></div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-outline" style="flex:1" id="testConnBtn" onclick="testConnection()" disabled>🔌 Test Connection</button>
+            <button class="btn btn-ghost" onclick="clearApiConfig()" title="Clear API config">✕</button>
+          </div>
+          <div id="connTestResult" style="margin-top:9px"></div>
+        </div>
       </div>
 
     </div>
@@ -390,6 +418,7 @@ tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
             <span class="alert-icon">⚙️</span>
             <div>API key and model load from <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px">.env</code> — no manual entry needed.</div>
           </div>
+          <div id="apiTargetBanner" style="margin-bottom:11px"></div>
           <div id="pipelinePrecheck"></div>
           <button class="btn btn-success btn-full btn-lg" id="runBtn" onclick="runPipeline()" disabled>▶ Run Full Test Pipeline</button>
           <div class="progress-wrap mt-3"><div class="progress-bar" id="progressBar"></div></div>
@@ -414,8 +443,8 @@ tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
             </div>
             <div class="agent-card" data-num="3">
               <div class="agent-name">API Executor</div><div class="agent-role">Test Runner</div>
-              <div class="agent-desc">Executes every request against the mock rule-based API and collects real responses for each test scenario.</div>
-              <span class="agent-badge">Mock API Tool</span>
+              <div class="agent-desc">Sends requests to the configured real API endpoint, or falls back to the built-in mock engine if no URL is set.</div>
+              <span class="agent-badge" id="agentApiBadge">Mock Engine</span>
             </div>
             <div class="agent-card" data-num="4">
               <div class="agent-name">Test Verifier</div><div class="agent-role">QA Analyst</div>
@@ -512,12 +541,16 @@ tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
         <hr class="divider" style="margin:11px 0"/>
         <label>Request Preview</label>
         <div class="json-block" id="reqPreview" style="max-height:140px;font-size:.68rem"></div>
-        <button class="btn btn-primary btn-full" style="margin-top:11px" onclick="manualExecute()">▶ Execute Request</button>
+        <div id="manualApiInfo" style="margin:9px 0"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:4px" onclick="manualExecute()">▶ Execute Request</button>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card">
-          <div class="card-title">📡 Response</div>
+          <div class="card-title" style="justify-content:space-between">
+            <span>📡 Response</span>
+            <span id="manualApiUsedLabel" style="font-size:.65rem;font-weight:600;padding:2px 8px;border-radius:10px;display:none"></span>
+          </div>
           <div id="manualResponse">
             <div class="empty-state" style="padding:26px">
               <span class="icon" style="font-size:1.8rem;opacity:.3">📡</span>
@@ -549,6 +582,107 @@ tbody td{padding:8px 12px;color:var(--tx-soft);vertical-align:middle}
 
 <script>
 let SESSION_ID=null,allResults=[],activeFilters=new Set(['ALL']),sseSource=null;
+let _apiUrl='',_bearerToken='';
+
+/* ── API Config helpers ── */
+function getApiUrl(){return (document.getElementById('apiUrl')||{}).value?.trim()||'';}
+function getBearerToken(){return (document.getElementById('bearerToken')||{}).value?.trim()||'';}
+
+function onApiUrlChange(){
+  const url=getApiUrl();
+  const btn=document.getElementById('testConnBtn');
+  if(btn)btn.disabled=!url;
+  updateApiStatusBanner();
+  updateApiTargetBanner();
+  updateAgentBadge();
+  updateManualApiInfo();
+}
+
+function updateApiStatusBanner(){
+  const url=getApiUrl();
+  const el=document.getElementById('apiStatusBanner');if(!el)return;
+  if(url){
+    const hasToken=getBearerToken();
+    el.innerHTML=`<div class="alert alert-success" style="padding:7px 11px">
+      <span class="alert-icon">🌐</span>
+      <div style="font-size:.74rem"><b>Real API configured</b><br>
+      <code style="font-size:.68rem;color:var(--cyan);word-break:break-all">${escHtml(url)}</code>
+      ${hasToken?'<br><span style="color:var(--green)">🔐 Bearer token set</span>':''}</div></div>`;
+  } else {
+    el.innerHTML=`<div class="alert alert-warn" style="padding:7px 11px">
+      <span class="alert-icon">🧪</span>
+      <div style="font-size:.74rem">No URL set — pipeline will use the <b>built-in mock engine</b></div></div>`;
+  }
+}
+
+function updateApiTargetBanner(){
+  const url=getApiUrl();
+  const el=document.getElementById('apiTargetBanner');if(!el)return;
+  if(url){
+    el.innerHTML=`<div class="alert alert-success" style="padding:8px 12px">
+      <span class="alert-icon">🌐</span>
+      <div style="font-size:.76rem"><b>Real API target:</b>
+      <code style="font-size:.7rem;color:var(--cyan);word-break:break-all;margin-left:4px">${escHtml(url)}</code>
+      ${getBearerToken()?'&nbsp;<span style="color:var(--green)">🔐 Auth</span>':''}</div></div>`;
+  } else {
+    el.innerHTML=`<div class="alert alert-warn" style="padding:8px 12px">
+      <span class="alert-icon">🧪</span>
+      <div style="font-size:.76rem"><b>Mock engine</b> — no API URL configured. Set one in <b>Setup → Step 4</b>.</div></div>`;
+  }
+}
+
+function updateAgentBadge(){
+  const el=document.getElementById('agentApiBadge');if(!el)return;
+  const url=getApiUrl();
+  if(url){el.textContent='Real API';el.style.background='rgba(16,185,129,.15)';el.style.color='var(--green)';el.style.borderColor='rgba(16,185,129,.3)';}
+  else{el.textContent='Mock Engine';el.style.background='';el.style.color='';el.style.borderColor='';}
+}
+
+function updateManualApiInfo(){
+  const url=getApiUrl();
+  const el=document.getElementById('manualApiInfo');if(!el)return;
+  if(url){
+    el.innerHTML=`<div style="font-size:.7rem;padding:5px 9px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:6px;color:var(--green)">
+      🌐 Will call: <code style="font-size:.67rem;color:var(--cyan)">${escHtml(url)}</code>
+      ${getBearerToken()?'&nbsp;🔐':''}</div>`;
+  } else {
+    el.innerHTML=`<div style="font-size:.7rem;padding:5px 9px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:6px;color:var(--amber)">
+      🧪 Using mock engine — <a href="#" onclick="switchTab('setup',document.querySelector('[data-tab=setup]'));return false;" style="color:var(--blue)">configure API URL in Setup</a></div>`;
+  }
+}
+
+function toggleTokenVisibility(){
+  const inp=document.getElementById('bearerToken');
+  if(!inp)return;
+  inp.type=inp.type==='password'?'text':'password';
+  document.getElementById('tokenToggleBtn').textContent=inp.type==='password'?'👁':'🙈';
+}
+
+function clearApiConfig(){
+  const url=document.getElementById('apiUrl'),tok=document.getElementById('bearerToken');
+  if(url)url.value='';if(tok)tok.value='';
+  const btn=document.getElementById('testConnBtn');if(btn)btn.disabled=true;
+  showAlert('connTestResult','','');
+  updateApiStatusBanner();updateApiTargetBanner();updateAgentBadge();updateManualApiInfo();
+}
+
+async function testConnection(){
+  const url=getApiUrl();if(!url)return;
+  showAlert('connTestResult','info','Pinging API…');
+  try{
+    let sampleReq={id:'connection-test'};
+    try{sampleReq=JSON.parse(document.getElementById('sampleRequest').value);}catch(e){}
+    const res=await fetch('/api/test-connection',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({api_url:url,bearer_token:getBearerToken()||null,sample_request:sampleReq})});
+    const data=await res.json();
+    if(data.ok){
+      showAlert('connTestResult','success',`Connection successful! API responded with status: ${data.response?.status||'OK'}`);
+    } else {
+      const reason=data.response?.exemptionReason||data.response?.status||'Unknown error';
+      showAlert('connTestResult','error',`Connection failed: ${reason}`);
+    }
+  }catch(e){showAlert('connTestResult','error','Network error: '+e.message);}
+}
 
 const DEFAULTS={
 rules:`Below rules are listed in priority wise. Exemption will be happened based on the priority.
@@ -620,6 +754,11 @@ async function init(){
   updateReqPreview();
   document.getElementById('sampleRequest').addEventListener('input',()=>validateJSON('sampleRequest','reqJsonAlert'));
   document.getElementById('sampleResponse').addEventListener('input',()=>validateJSON('sampleResponse','respJsonAlert'));
+  // Bearer token change also refreshes banners
+  const tokEl=document.getElementById('bearerToken');
+  if(tokEl)tokEl.addEventListener('input',()=>{updateApiStatusBanner();updateApiTargetBanner();updateManualApiInfo();});
+  // Initialise API config UI
+  updateApiStatusBanner();updateApiTargetBanner();updateAgentBadge();updateManualApiInfo();
 
   // Drag-and-drop on upload zone
   const zone=document.getElementById('uploadZone');
@@ -698,7 +837,8 @@ async function indexRules(){
   showAlert('indexAlert','info','Indexing rules into FAISS vector DB…');
   try{
     const res=await fetch('/api/rules/index',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:SESSION_ID,rules_text:rules,sample_request:sampleReq,sample_response:sampleResp})});
+      body:JSON.stringify({session_id:SESSION_ID,rules_text:rules,sample_request:sampleReq,sample_response:sampleResp,
+        api_url:getApiUrl()||null,bearer_token:getBearerToken()||null})});
     const data=await res.json();
     if(res.ok){showAlert('indexAlert','success',data.message);document.getElementById('chunkInfo').textContent=`${data.chunks} chunks indexed · FAISS ready`;updateSidebar({rules:true});await checkPipelineReady();}
     else showAlert('indexAlert','error',data.detail||'Indexing failed');
@@ -748,12 +888,14 @@ async function checkPipelineReady(){
 
 async function runPipeline(){
   if(!SESSION_ID)return;
+  updateApiTargetBanner();
   document.getElementById('runBtn').disabled=true;
   document.getElementById('logBox').innerHTML='';
   document.getElementById('progressBar').style.width='0%';
   document.getElementById('progressPct').textContent='0%';
   updateSidebar({pipeline:'Running'});
-  await fetch('/api/pipeline/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID})});
+  await fetch('/api/pipeline/start',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session_id:SESSION_ID,api_url:getApiUrl()||null,bearer_token:getBearerToken()||null})});
   if(sseSource)sseSource.close();
   sseSource=new EventSource(`/api/pipeline/stream/${SESSION_ID}`);
   sseSource.onmessage=e=>{
@@ -924,10 +1066,22 @@ function updateReqPreview(){document.getElementById('reqPreview').textContent=JS
 
 async function manualExecute(){
   const req=buildManualReq();
-  const data=await fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request:req})}).then(r=>r.json());
+  const url=getApiUrl(),token=getBearerToken();
+  const data=await fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({request:req,api_url:url||null,bearer_token:token||null})}).then(r=>r.json());
   const resp=data.response;
   const isExempt=resp.exemptionStatus==='Exempt',isErr=resp.status==='ERROR'||resp.status==='INVALID_DATA';
   const ac=isErr?'alert-error':isExempt?'alert-success':'alert-warn',icon=isErr?'❌':isExempt?'✅':'⚠️';
+  // Show which API was used
+  const usedLabel=document.getElementById('manualApiUsedLabel');
+  if(usedLabel){
+    if(data.used_real_api){
+      usedLabel.textContent='🌐 Real API';usedLabel.style.background='rgba(16,185,129,.15)';usedLabel.style.color='var(--green)';usedLabel.style.border='1px solid rgba(16,185,129,.3)';
+    } else {
+      usedLabel.textContent='🧪 Mock';usedLabel.style.background='rgba(245,158,11,.1)';usedLabel.style.color='var(--amber)';usedLabel.style.border='1px solid rgba(245,158,11,.25)';
+    }
+    usedLabel.style.display='inline-block';
+  }
   document.getElementById('manualResponse').innerHTML=`
     <div class="alert ${ac}" style="margin-bottom:11px">
       <span class="alert-icon">${icon}</span>
