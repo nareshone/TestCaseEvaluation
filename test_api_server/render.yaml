@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: cev-test-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: API_BEARER_TOKEN
+        value: test-bearer-token-123   # ← change this to your own secret token
