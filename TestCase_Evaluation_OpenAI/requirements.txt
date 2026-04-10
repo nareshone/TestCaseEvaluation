@@ -20,6 +20,9 @@ openpyxl>=3.1.2
 # Config / environment
 python-dotenv>=1.0.0
 
+# HTTP client — handles HTTPS redirects (e.g. Render deployments)
+requests>=2.31.0
+
 # ─────────────────────────────────────────────────────────────
 # REMOVED (were unused or brought in massive transitive deps):
 #   crewai              — pulled torch (~300 MB) + chromadb (~80 MB)

@@ -678,8 +678,9 @@ async function testConnection(){
     if(data.ok){
       showAlert('connTestResult','success',`Connection successful! API responded with status: ${data.response?.status||'OK'}`);
     } else {
-      const reason=data.response?.exemptionReason||data.response?.status||'Unknown error';
-      showAlert('connTestResult','error',`Connection failed: ${reason}`);
+      const reason=data.response?.exemptionReason||data.response?.status||data.error||'Unknown error';
+      const detail=data.api_url?` (URL: ${data.api_url})`:'';
+      showAlert('connTestResult','error',`Connection failed: ${reason}${detail}`);
     }
   }catch(e){showAlert('connTestResult','error','Network error: '+e.message);}
 }
@@ -840,8 +841,8 @@ async function indexRules(){
       body:JSON.stringify({session_id:SESSION_ID,rules_text:rules,sample_request:sampleReq,sample_response:sampleResp,
         api_url:getApiUrl()||null,bearer_token:getBearerToken()||null})});
     const data=await res.json();
-    if(res.ok){showAlert('indexAlert','success',data.message);document.getElementById('chunkInfo').textContent=`${data.chunks} chunks indexed · FAISS ready`;updateSidebar({rules:true});await checkPipelineReady();}
-    else showAlert('indexAlert','error',data.detail||'Indexing failed');
+    if(res.ok && data.status==='indexed'){showAlert('indexAlert','success',data.message||'Rules indexed successfully');document.getElementById('chunkInfo').textContent=`${data.chunks} chunks indexed · FAISS ready`;updateSidebar({rules:true});await checkPipelineReady();}
+    else showAlert('indexAlert','error',data.error||data.detail||data.message||'Indexing failed — check server logs');
   }catch(e){showAlert('indexAlert','error','Network error: '+e.message);}
 }
 

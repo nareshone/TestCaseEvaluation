@@ -3,11 +3,18 @@ mock_api.py - API executor: calls a real HTTP endpoint when configured,
               falls back to built-in mock rules for demo/testing.
 """
 import json
-import urllib.request
-import urllib.error
-import ssl
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+
+# Use requests if available (handles HTTPS/redirects better), fall back to urllib
+try:
+    import requests as _requests
+    _USE_REQUESTS = True
+except ImportError:
+    import urllib.request
+    import urllib.error
+    import ssl
+    _USE_REQUESTS = False
 
 
 def determine_exemption(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -105,65 +112,71 @@ def execute_real_request(
     bearer_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Execute a request against a real HTTP API endpoint.
-    Returns the parsed JSON response, or an error dict on failure.
+    Execute a POST request against a real HTTP/HTTPS API endpoint.
+    Uses `requests` library when available (handles redirects, HTTPS, Render),
+    falls back to urllib otherwise.
+    Always returns a dict — never raises.
     """
-    try:
-        payload = json.dumps(request_json).encode("utf-8")
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        # Only add Authorization header if token is a non-empty, non-whitespace string
-        clean_token = (bearer_token or "").strip()
-        if clean_token:
-            headers["Authorization"] = f"Bearer {clean_token}"
+    ts = datetime.now().isoformat()
 
-        # Create an SSL context that tolerates self-signed/dev certs
+    # Build headers
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    clean_token = (bearer_token or "").strip()
+    if clean_token:
+        headers["Authorization"] = f"Bearer {clean_token}"
+
+    # ── requests path (preferred) ────────────────────────────────────────────
+    if _USE_REQUESTS:
+        try:
+            resp = _requests.post(
+                api_url,
+                json=request_json,
+                headers=headers,
+                timeout=30,
+                allow_redirects=True,
+                verify=False,          # tolerate self-signed certs on dev/render
+            )
+            # Try to parse as JSON regardless of status code
+            try:
+                return resp.json()
+            except Exception:
+                return {
+                    "timestamp": ts, "status": "ERROR",
+                    "exemptionStatus": None,
+                    "exemptionReason": (
+                        f"HTTP {resp.status_code} — non-JSON response: "
+                        f"{resp.text[:300]}"
+                    ),
+                    "ruleFired": None,
+                }
+        except _requests.exceptions.ConnectionError as e:
+            return {"timestamp": ts, "status": "ERROR", "exemptionStatus": None,
+                    "exemptionReason": f"Connection error: {str(e)}", "ruleFired": None}
+        except _requests.exceptions.Timeout:
+            return {"timestamp": ts, "status": "ERROR", "exemptionStatus": None,
+                    "exemptionReason": "Request timed out (30s)", "ruleFired": None}
+        except Exception as e:
+            return {"timestamp": ts, "status": "ERROR", "exemptionStatus": None,
+                    "exemptionReason": f"Unexpected error: {str(e)}", "ruleFired": None}
+
+    # ── urllib fallback ──────────────────────────────────────────────────────
+    try:
+        import urllib.request, urllib.error, ssl
+        payload = json.dumps(request_json).encode("utf-8")
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-
         req = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
             raw = resp.read().decode("utf-8")
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
-                return {
-                    "timestamp": datetime.now().isoformat(),
-                    "status": "ERROR",
-                    "exemptionStatus": None,
-                    "exemptionReason": f"Non-JSON response from API: {raw[:200]}",
-                    "ruleFired": None,
-                }
-
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            pass
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "status": "ERROR",
-            "exemptionStatus": None,
-            "exemptionReason": f"HTTP {e.code} {e.reason}: {body[:300]}",
-            "ruleFired": None,
-        }
-    except urllib.error.URLError as e:
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "status": "ERROR",
-            "exemptionStatus": None,
-            "exemptionReason": f"Connection error: {e.reason}",
-            "ruleFired": None,
-        }
+                return {"timestamp": ts, "status": "ERROR", "exemptionStatus": None,
+                        "exemptionReason": f"Non-JSON response: {raw[:300]}", "ruleFired": None}
     except Exception as e:
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "status": "ERROR",
-            "exemptionStatus": None,
-            "exemptionReason": f"Unexpected error: {str(e)}",
-            "ruleFired": None,
-        }
+        return {"timestamp": ts, "status": "ERROR", "exemptionStatus": None,
+                "exemptionReason": str(e), "ruleFired": None}
 
 
 def execute_request(request_json: Dict[str, Any]) -> Dict[str, Any]:
